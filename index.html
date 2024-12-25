@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One Color</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 80vh;
+            background-color: #ddd;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        #score {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .block {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .selected {
+            border-color: yellow;
+            opacity: 0.7;
+        }
+
+        .matched {
+            background-color: lightgreen;
+        }
+
+        .error {
+            background-color: lightcoral;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container"></div>
+    <div id="score">Очки: 0</div>
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const scoreDisplay = document.getElementById('score');
+        let score = 0;
+        let blocks = [];
+        let selectedBlocks = []; // Для хранения выбранных блоков
+        let gameInterval;
+        let blockInterval;
+        let gameTime = 0; // время игры в секундах
+
+        // Функция для создания случайного цвета
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Функция для проверки, не занято ли место
+        function isOccupied(x, y, size) {
+            return blocks.some(b => {
+                const bX = b.x;
+                const bY = b.y;
+                const bSize = b.size;
+
+                // Проверка, если блоки пересекаются
+                return !(x + size < bX || x > bX + bSize || y + size < bY || y > bY + bSize);
+            });
+        }
+
+        // Функция для создания блока
+        function createBlock() {
+            const size = Math.floor(Math.random() * 70) + 80; // размер от 30px до 80px
+            const color = getRandomColor();
+            let x, y;
+
+            // Генерируем координаты, проверяя, занято ли место
+            do {
+                x = Math.floor(Math.random() * (gameContainer.offsetWidth - size));
+                y = Math.floor(Math.random() * (gameContainer.offsetHeight - size));
+            } while (isOccupied(x, y, size)); // Если место занято, генерируем заново
+
+            const block = document.createElement('div');
+            block.style.width = `${size}px`;
+            block.style.height = `${size}px`;
+            block.style.backgroundColor = color;
+            block.style.left = `${x}px`;
+            block.style.top = `${y}px`;
+            block.classList.add('block');
+
+            block.addEventListener('click', () => handleBlockClick(block, color));
+
+            gameContainer.appendChild(block);
+            blocks.push({ block, color, size, x, y });
+        }
+
+        // Обработчик клика по блоку
+        function handleBlockClick(block, color) {
+            // Если блок уже выбран, игнорируем клик
+            if (selectedBlocks.length === 2 && !selectedBlocks.includes(block)) {
+                return;
+            }
+
+            // Подсвечиваем выбранный блок
+            block.classList.add('selected');
+            selectedBlocks.push(block);
+
+            // Если выбраны два блока
+            if (selectedBlocks.length === 2) {
+                const [firstBlock, secondBlock] = selectedBlocks;
+                if (firstBlock.style.backgroundColor === secondBlock.style.backgroundColor) {
+                    // Блоки совпали
+                    score++;
+                    scoreDisplay.textContent = `Очки: ${score}`;
+                    firstBlock.classList.add('matched');
+                    secondBlock.classList.add('matched');
+                    setTimeout(() => {
+                        firstBlock.remove();
+                        secondBlock.remove();
+                        blocks = blocks.filter(b => b.block !== firstBlock && b.block !== secondBlock);
+                    }, 300);
+                } else {
+                    // Блоки не совпали
+                    setTimeout(() => {
+                        firstBlock.classList.remove('selected');
+                        secondBlock.classList.remove('selected');
+                    }, 500);
+                }
+
+                selectedBlocks = []; // Сбрасываем выбор
+            }
+        }
+
+        // Функция для появления блока с таким же цветом, но разного размера
+        function createMatchingBlock() {
+            if (blocks.length === 0) return;
+
+            const randomBlock = blocks[Math.floor(Math.random() * blocks.length)];
+            const size = Math.floor(Math.random() * 90) + 60; // размер от 30px до 80px
+            let x, y;
+
+            // Генерируем координаты, проверяя, занято ли место
+            do {
+                x = Math.floor(Math.random() * (gameContainer.offsetWidth - size));
+                y = Math.floor(Math.random() * (gameContainer.offsetHeight - size));
+            } while (isOccupied(x, y, size)); // Если место занято, генерируем заново
+
+            const block = document.createElement('div');
+            block.style.width = `${size}px`;
+            block.style.height = `${size}px`;
+            block.style.backgroundColor = randomBlock.color;
+            block.style.left = `${x}px`;
+            block.style.top = `${y}px`;
+            block.classList.add('block');
+
+            block.addEventListener('click', () => handleBlockClick(block, randomBlock.color));
+
+            gameContainer.appendChild(block);
+        }
+
+        // Функция для обновления игры
+        function updateGame() {
+            gameTime++;
+
+            // Увеличим количество блоков
+            if (gameTime % 1 === 0) { // Создаем новый блок каждую секунду
+                createBlock();
+            }
+
+            // Каждые 8 секунд генерируем пару блоков с одинаковым цветом
+            if (gameTime % 4 === 0) {
+                createMatchingBlock();
+            }
+        }
+
+        // Функция для старта игры
+        function startGame() {
+            score = 0;
+            scoreDisplay.textContent = `Очки: ${score}`;
+            blocks = [];
+            selectedBlocks = [];
+            gameTime = 0;
+
+            if (gameInterval) clearInterval(gameInterval);
+            if (blockInterval) clearInterval(blockInterval);
+
+            gameInterval = setInterval(updateGame, 1000);
+        }
+
+        // Запуск игры
+        startGame();
+
+    </script>
+</body>
+
+</html>
